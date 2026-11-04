@@ -1,0 +1,14 @@
+# PC で実行するときだけ docker-compose.yml に重ねる設定。ホストの ~/.aws のプロファイルを読み取り専用でマウントする。
+# EC2 ではインスタンスの IAM ロールを使うため、このファイルは使わない。
+# .env に COMPOSE_FILE=docker-compose.yml;docker-compose.local.yml（Linux / macOS では区切りを : にする）を書くと、
+# docker compose のコマンドで毎回 -f を指定しなくても自動で重ねられる。
+services:
+  cloudops:
+    environment:
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      HOME: /home/nonroot
+      AWS_CONFIG_FILE: /home/nonroot/.aws/config
+      AWS_SHARED_CREDENTIALS_FILE: /home/nonroot/.aws/credentials
+    volumes:
+      # Windows では %USERPROFILE%\.aws を使う。Linux などでは .env の AWS_CONFIG_DIR で指定する
+      - "${AWS_CONFIG_DIR:-${USERPROFILE}/.aws}:/home/nonroot/.aws:ro"

@@ -1,0 +1,15 @@
+{
+  "mode": "aws",
+  "address": "127.0.0.1:8080",
+  "region": "",
+  "timezone": "UTC",
+  "collection_interval": "5m",
+  "idle_pause_after": "30m",
+  "waf": { "web_acl_id": "", "web_acl_name": "", "region": "us-east-1", "scope": "CLOUDFRONT" },
+  "ec2": { "instance_ids": [], "memory_namespace": "CWAgent", "memory_metric": "mem_used_percent" },
+  "rds": { "instance_ids": [] },
+  "athena": { "region": "", "database": "", "catalog": "AwsDataCatalog", "workgroup": "", "results_location": "", "table": "", "queries_dir": "queries", "daily_budget_usd": 1.0, "max_query_days": 31 },
+  "database": { "path": "data/cloudops.db" },
+  "auth": { "session_ttl": "12h", "cookie_secure": false },
+  "trusted_proxies": []
+}

@@ -1,0 +1,40 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadOnlyInfrastructureMonitoring",
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity",
+        "cloudwatch:GetMetricData",
+        "cloudwatch:ListMetrics",
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceStatus",
+        "rds:DescribeDBInstances",
+        "wafv2:GetSampledRequests"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AthenaReadOnlyQueries",
+      "Effect": "Allow",
+      "Action": [
+        "athena:StartQueryExecution",
+        "athena:GetQueryExecution",
+        "athena:GetQueryResults",
+        "athena:StopQueryExecution",
+        "athena:GetWorkGroup",
+        "athena:ListQueryExecutions",
+        "athena:BatchGetQueryExecution",
+        "glue:GetDatabase",
+        "glue:GetTable",
+        "glue:GetPartitions",
+        "s3:GetBucketLocation",
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:PutObject"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

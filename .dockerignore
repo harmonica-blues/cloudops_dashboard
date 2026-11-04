@@ -1,0 +1,26 @@
+.git
+config.json
+.env
+*.exe
+cloudops
+data/
+*.db
+*.db-wal
+*.db-shm
+notes/
+.env.local
+*.tar
+*.tgz
+
+# Local configuration and generated files
+.env.*
+config.*.json
+!config.example.json
+backup/
+__pycache__/
+*.py[cod]
+*.log
+.DS_Store
+
+# Local-only maintenance page
+deploy/maintenance/

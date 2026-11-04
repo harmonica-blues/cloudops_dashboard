@@ -1,0 +1,32 @@
+services:
+  cloudops:
+    build: .
+    # イメージ名を固定する。PC でビルドして docker save した tar を EC2 で docker load し、
+    # docker compose up -d（--build なし）で起動できるようにする（README「更新のデプロイ」）
+    image: ec2-dash-cloudops:latest
+    # EC2 の再起動後や、プロセスが異常終了したときに自動で起動し直す（docker compose down / stop で止めた場合は起動しない）
+    restart: unless-stopped
+    ports:
+      # 公開するアドレスとポートは .env の CLOUDOPS_BIND_ADDRESS / CLOUDOPS_PORT で指定する（既定はこのPCのみ）
+      - "${CLOUDOPS_BIND_ADDRESS:-127.0.0.1}:${CLOUDOPS_PORT:-8080}:8080"
+    environment:
+      CLOUDOPS_MODE: ${CLOUDOPS_MODE:-aws}
+      CLOUDOPS_ADDRESS: 0.0.0.0:8080
+      CLOUDOPS_CONFIG: /app/config.json
+      CLOUDOPS_DB: /data/cloudops.db
+      # ALB など、X-Forwarded-For / X-Forwarded-Proto を信頼する接続元の CIDR（カンマ区切り、空なら使わない）
+      CLOUDOPS_TRUSTED_PROXIES: ${CLOUDOPS_TRUSTED_PROXIES:-}
+      AWS_REGION: ${AWS_REGION:-}
+    # AWS の認証情報はマウントしない。EC2 ではインスタンスの IAM ロール（IMDSv2、ホップ数の上限 2）を使う。
+    # PC で ~/.aws のプロファイルを使う場合は docker-compose.local.yml を重ねる（README を参照）
+    volumes:
+      - "${CLOUDOPS_CONFIG_FILE:-./config.example.json}:/app/config.json:ro"
+      - "./queries:/app/queries:ro"
+      # ユーザー・操作ログ・クエリ履歴・使用額を保存する SQLite。書き込めるのはこのボリュームだけ（コンテナを再作成しても残る）
+      - "cloudops-data:/data"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  cloudops-data:
