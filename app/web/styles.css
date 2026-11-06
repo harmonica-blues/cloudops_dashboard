@@ -123,6 +123,7 @@ nav button.active{background:var(--text);color:var(--bg)}
 .ring-row{display:flex;align-items:center;gap:16px}
 .ring-legend{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:13px}
 .ring-legend i{display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:50%}
+.ring-legend strong{display:block}
 .capsule{height:8px;margin-top:4px;overflow:hidden;border-radius:99px;background:var(--line)}
 .capsule i{display:block;height:100%;border-radius:99px;background:var(--cyan)}
 .kv{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted)}

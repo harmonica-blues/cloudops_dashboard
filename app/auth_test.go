@@ -85,6 +85,66 @@ func TestLoginCreatesSessionAndAuditLog(t *testing.T) {
 	}
 }
 
+func TestSharedDashboardURLSurvivesLogin(t *testing.T) {
+	app := newTestApp(t, "demo")
+	params := url.Values{
+		"page": {"waf"}, "period": {"custom"},
+		"start": {"2026-11-01T00:00:00.000Z"}, "end": {"2026-11-02T00:00:00.000Z"},
+	}
+	destination := "/?" + params.Encode()
+	loginURL := "/login?" + params.Encode()
+	response := httptest.NewRecorder()
+	app.handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, destination, nil))
+	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != loginURL {
+		t.Fatalf("shared URL redirect = %d %q, want %q", response.Code, response.Header().Get("Location"), loginURL)
+	}
+
+	response = httptest.NewRecorder()
+	app.handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, loginURL, nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `<form method="post">`) {
+		t.Fatal("login form must submit to its current URL, preserving shared parameters")
+	}
+
+	for _, password := range []string{"incorrect", "correct horse battery"} {
+		form := url.Values{"username": {"tester"}, "password": {password}}
+		request := httptest.NewRequest(http.MethodPost, loginURL, strings.NewReader(form.Encode()))
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		response = httptest.NewRecorder()
+		app.handler().ServeHTTP(response, request)
+		if password == "incorrect" {
+			if response.Code != http.StatusUnauthorized || !strings.Contains(response.Body.String(), `<form method="post">`) {
+				t.Fatal("failed login must allow retrying with the same shared parameters")
+			}
+		} else if response.Code != http.StatusSeeOther || response.Header().Get("Location") != destination {
+			t.Fatalf("login destination = %d %q, want %q", response.Code, response.Header().Get("Location"), destination)
+		}
+	}
+
+	response = httptest.NewRecorder()
+	serveAs(app, response, httptest.NewRequest(http.MethodGet, loginURL, nil))
+	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != destination {
+		t.Fatal("an authenticated visitor must also return to the shared dashboard URL")
+	}
+}
+
+func TestDashboardURLOnlyPreservesViewParameters(t *testing.T) {
+	for _, target := range []string{
+		"/login?next=https://example.org&sql=SELECT+1",
+		"/login?page=waf&period=7&next=//example.org&sql=SELECT+1",
+		"/login?page=https%3A%2F%2Fexample.org%2F%3Fx%3D1",
+	} {
+		request := httptest.NewRequest(http.MethodGet, target, nil)
+		destination, err := url.Parse(dashboardURL(request))
+		if err != nil || destination.IsAbs() || destination.Host != "" || destination.Path != "/" {
+			t.Fatalf("destination must stay at the local dashboard root: %v", destination)
+		}
+		query := destination.Query()
+		if query.Has("next") || query.Has("sql") || query.Get("page") != request.URL.Query().Get("page") {
+			t.Fatalf("unexpected preserved parameters: %v", query)
+		}
+	}
+}
+
 func TestLoginLocksAfterRepeatedFailures(t *testing.T) {
 	app := newTestApp(t, "demo")
 	for attempt := 0; attempt < maxLoginFailures; attempt++ {

@@ -255,6 +255,20 @@ func isPublicPath(path string) bool {
 	return path == "/login" || path == "/styles.css" || path == "/api/health"
 }
 
+// 共有リンクの画面・期間だけをログイン後へ引き継ぐ。遷移先は常に同じサイトのルート。
+func dashboardURL(r *http.Request) string {
+	params := url.Values{}
+	for _, key := range []string{"page", "period", "start", "end"} {
+		if value := r.URL.Query().Get(key); value != "" {
+			params.Set(key, value)
+		}
+	}
+	if len(params) == 0 {
+		return "/"
+	}
+	return "/?" + params.Encode()
+}
+
 // authenticate はログインしていないアクセスを止める。API は 401 を返し、画面はログインページに移動する。
 func (a *App) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -272,7 +286,7 @@ func (a *App) authenticate(next http.Handler) http.Handler {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "ログインしてください"})
 				return
 			}
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			http.Redirect(w, r, "/login"+strings.TrimPrefix(dashboardURL(r), "/"), http.StatusSeeOther)
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), contextKey{}, user)))
@@ -292,7 +306,7 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		if a.sessionUser(r) != nil {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+			http.Redirect(w, r, dashboardURL(r), http.StatusSeeOther)
 			return
 		}
 		a.renderLogin(w, http.StatusOK, "", "")
@@ -320,7 +334,7 @@ func (a *App) loginHandler(w http.ResponseWriter, r *http.Request) {
 		a.setSessionCookie(w, r, token, expires)
 		a.audit(r.WithContext(context.WithValue(r.Context(), contextKey{}, user)), "login", nil)
 		slog.Info("login", "username", user.Username)
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, dashboardURL(r), http.StatusSeeOther)
 	default:
 		w.Header().Set("Allow", "GET, POST")
 		http.Error(w, "許可されていないメソッドです", http.StatusMethodNotAllowed)

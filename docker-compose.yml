@@ -2,7 +2,7 @@ services:
   cloudops:
     build: .
     # イメージ名を固定する。PC でビルドして docker save した tar を EC2 で docker load し、
-    # docker compose up -d（--build なし）で起動できるようにする（README「更新のデプロイ」）
+    # docker compose up -d（--build なし）で起動できるようにする（docs/operations.ja.md「更新のデプロイ」）
     image: ec2-dash-cloudops:latest
     # EC2 の再起動後や、プロセスが異常終了したときに自動で起動し直す（docker compose down / stop で止めた場合は起動しない）
     restart: unless-stopped

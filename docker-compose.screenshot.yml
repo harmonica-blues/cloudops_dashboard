@@ -1,0 +1,20 @@
+# 実環境の .env や認証情報を使わない、撮影専用の独立した構成。
+name: cloudops-screenshot
+services:
+  cloudops:
+    build: .
+    image: cloudops-screenshot:latest
+    ports:
+      - "127.0.0.1:8083:8080"
+    environment:
+      CLOUDOPS_MODE: screenshot
+      CLOUDOPS_CONFIG: /app/config.example.json
+      CLOUDOPS_DB: /data/cloudops.db
+      AWS_EC2_METADATA_DISABLED: "true"
+    volumes:
+      - screenshot-data:/data
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  screenshot-data:

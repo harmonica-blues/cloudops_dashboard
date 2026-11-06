@@ -14,7 +14,7 @@
 <body class="login-page">
   <main class="login-card card">
     <div class="brand"><div class="brand-mark" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l5-5 4 4 7-8"/></svg></div><div><strong>CloudOps</strong><small>ダッシュボードにログイン</small></div></div>
-    <form method="post" action="/login">
+    <form method="post">
       <label>ユーザー名<input name="username" value="{{.Username}}" autocomplete="username" autocapitalize="none" spellcheck="false" required {{if not .Username}}autofocus{{end}}></label>
       <label>パスワード<input name="password" type="password" autocomplete="current-password" required {{if .Username}}autofocus{{end}}></label>
       {{if .Error}}<div class="notice danger" role="alert">{{.Error}}</div>{{end}}

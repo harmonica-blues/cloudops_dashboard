@@ -6,7 +6,7 @@ const pages = {
   queries: ['クエリ', 'Athenaオンデマンドクエリ', '⌕']
 };
 // バックエンドが返すステータス値（英語）を画面表示用の日本語に変換する
-const statusLabels = { Healthy: '正常', Check: '要確認', Unknown: '不明', updated: 'AWSデータ更新済み', waiting: '収集待ち', error: 'エラー', QUEUED: '待機中', RUNNING: '実行中', SUCCEEDED: '成功', FAILED: '失敗', CANCELLED: 'キャンセル' };
+const statusLabels = { Healthy: '正常', Check: '要確認', Unknown: '不明', screenshot: '撮影用データ表示中', updated: 'AWSデータ更新済み', waiting: '収集待ち', error: 'エラー', QUEUED: '待機中', RUNNING: '実行中', SUCCEEDED: '成功', FAILED: '失敗', CANCELLED: 'キャンセル' };
 // インスタンスごとの線の色（複数インスタンスを1つのグラフに重ねるとき用）。CSS 変数なのでライト/ダークの切り替えに追従する
 const SERIES_COLORS = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)'];
 // WAF のアクションごとの色。バックエンドが返す色を Bento テーマの色に置き換える
@@ -14,6 +14,8 @@ const ACTION_COLORS = { 許可: 'var(--s2)', ブロック: 'var(--s1)', カウ�
 // 概要画面のタイル見出しに使う期間の名前
 const PERIOD_LABELS = { 1: '24時間', 7: '7日間', 30: '30日間' };
 const CHART = { width: 680, height: 230, left: 52, right: 14, top: 14, bottom: 30 };
+const CHART_ENTRANCE_MS = 1100;
+let chartEntranceStartedAt = -CHART_ENTRANCE_MS;
 const AXIS_DATE = { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' };
 // 画面を自動更新する間隔。バックエンドのキャッシュを読むだけなので AWS への追加呼び出しは発生しない
 const AUTO_REFRESH_MS = 60 * 1000;
@@ -23,6 +25,8 @@ const QUERY_POLL_MS = 2000;
 // selectedQuery: プルダウンで選択中の保存済みクエリ、filledSql: プレースホルダーを置き換えた直後の SQL（未編集かどうかの判定用）
 // privateQuery: 「結果を共有しない」のチェック（SQL と結果を実行したユーザーにだけ表示する）
 const state = { page: 'overview', snapshot: null, queries: [], sql: '', search: '', loading: false, athena: null, savedQueries: [], selectedQuery: '', filledSql: '', resultId: '', polling: false, privateQuery: false };
+// 「カスタム期間」を開いただけでは適用済みの期間を変えない。
+let appliedPeriod = '1';
 // 描画中のグラフの情報。ツールチップ表示に使い、render() のたびに作り直す
 const chartRegistry = [];
 const THEME_KEY = 'cloudops-theme';
@@ -40,7 +44,7 @@ const decimal = value => {
 const axisNumber = value => new Intl.NumberFormat('ja-JP', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value) || 0);
 const number = value => new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 3 }).format(Number(value) || 0);
 // ログインの有効期限が切れたら（401）、ログイン画面に移動する
-const api = async (path, options) => { const response = await fetch(path, options); if (response.status === 401) { window.location.href = '/login'; throw new Error('ログインしてください'); } const data = await response.json(); if (!response.ok) throw new Error(data.error || 'APIエラー'); return data; };
+const api = async (path, options) => { const response = await fetch(path, options); if (response.status === 401) { window.location.href = '/login' + window.location.search; throw new Error('ログインしてください'); } const data = await response.json(); if (!response.ok) throw new Error(data.error || 'APIエラー'); return data; };
 const badge = (label, tone = '') => `<span class="badge ${tone}">${esc(label)}</span>`;
 const card = (title, body, extra = '', className = '') => `<article class="card ${className}"><div class="head"><h2>${title}</h2>${extra}</div>${body}</article>`;
 const meter = value => `${decimal(value)}%<span class="meter"><i style="width:${Math.max(0, Math.min(100, Number(value) || 0))}%"></i></span>`;
@@ -90,11 +94,11 @@ function nav() {
   $('nav').querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => changePage(button.dataset.page)));
 }
 function changePage(page) {
-  if (state.page === page) return;
+  if (!Object.hasOwn(pages, page) || state.page === page) return;
   state.page = page;
   state.search = '';
-  render();
-  loadDashboard();
+  render(true);
+  loadDashboard(false, false, false);
   if (page === 'queries') loadQueriesPage();
 }
 function setHeader() {
@@ -138,7 +142,7 @@ function drawChart(chart, width) {
   const marks = lines.map(item => item.points.length === 1
     ? `<circle cx="${x(item.times[0]).toFixed(1)}" cy="${y(item.points[0].v).toFixed(1)}" r="3" style="fill:${item.color}"/>`
     : `<polyline class="series" style="stroke:${item.color}" points="${item.points.map((point, index) => `${x(item.times[index]).toFixed(1)},${y(point.v).toFixed(1)}`).join(' ')}"/>`).join('');
-  return `${grid}${ticks}${marks}<line class="guide" y1="${top}" y2="${height - bottom}" visibility="hidden"/><rect class="hit" x="${left}" y="${top}" width="${width - left - right}" height="${height - top - bottom}"/>`;
+  return `${grid}${ticks}<g class="chart-data">${marks}</g><line class="guide" y1="${top}" y2="${height - bottom}" visibility="hidden"/><rect class="hit" x="${left}" y="${top}" width="${width - left - right}" height="${height - top - bottom}"/>`;
 }
 function layoutCharts() {
   document.querySelectorAll('.chart-wrap').forEach(wrap => {
@@ -150,6 +154,24 @@ function layoutCharts() {
     svg.setAttribute('viewBox', `0 0 ${width} ${CHART.height}`);
     svg.innerHTML = drawChart(chart, width);
   });
+}
+// 描画し直した場合も同じ再生位置から続け、バックグラウンド更新では再開しない。
+function animateCharts() {
+  const elapsed = performance.now() - chartEntranceStartedAt;
+  if (elapsed >= CHART_ENTRANCE_MS || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const play = (element, keyframes) => {
+    if (!element.animate || element.getAnimations().length) return;
+    const animation = element.animate(keyframes, { duration: CHART_ENTRANCE_MS, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+    animation.currentTime = elapsed;
+  };
+  document.querySelectorAll('.chart-data, .bars').forEach(element => play(element, [
+    { clipPath: 'inset(-6px 100% -6px -6px)' },
+    { clipPath: 'inset(-6px)' }
+  ]));
+  document.querySelectorAll('.ring-value').forEach(element => play(element, [
+    { strokeDasharray: `0 ${element.getTotalLength()}` },
+    { strokeDasharray: element.getAttribute('stroke-dasharray') }
+  ]));
 }
 // 概要画面のタイル内に置く小さな棒グラフ（軸なし）。系列を最大 32 本にまとめる
 function miniBars(points, color) {
@@ -163,7 +185,7 @@ function miniBars(points, color) {
 function ring(rings) {
   return `<svg class="ring" viewBox="0 0 120 120" aria-hidden="true">${rings.slice(0, 3).map(({ percent, color }, index) => {
     const radius = 50 - index * 15; const length = 2 * Math.PI * radius; const filled = Math.max(0, Math.min(100, Number(percent) || 0)) / 100 * length;
-    return `<circle class="ring-track" cx="60" cy="60" r="${radius}"/><circle cx="60" cy="60" r="${radius}" style="stroke:${color}" stroke-dasharray="${filled.toFixed(1)} ${length.toFixed(1)}"/>`;
+    return `<circle class="ring-track" cx="60" cy="60" r="${radius}"/><circle class="ring-value" cx="60" cy="60" r="${radius}" style="stroke:${color}" stroke-dasharray="${filled.toFixed(1)} ${length.toFixed(1)}"/>`;
   }).join('')}</svg>`;
 }
 const wafSeries = actions => actions.map(action => ({ name: action.name, color: action.color, points: action.series }));
@@ -197,7 +219,7 @@ function renderOverview() {
   return `<div class="bento">${hero}${allowedTile}${rdsTile}${ec2Tile('CPU', 'cpu_percent', 'cpu_available')}${ec2Tile('メモリ', 'memory_percent', 'memory_available')}${athenaTile}${ec2Table}</div>${statusNotice()}`;
 }
 // サンプルリクエストのアクション（バックエンドが日本語の表示名で返す）ごとのバッジの色
-const WAF_EVENT_TONES = { ブロック: 'red', チャレンジ: 'yellow', CAPTCHA: 'yellow', カウント: 'blue' };
+const WAF_EVENT_TONES = { ブロック: 'red', BLOCK: 'red', チャレンジ: 'yellow', CHALLENGE: 'yellow', CAPTCHA: 'yellow', カウント: 'blue', COUNT: 'blue', EXCLUDED_AS_COUNT: 'blue' };
 // ルール別ブロック数（選択期間、上位 10 件）。棒の長さは 1 位を 100% とした比率
 function ruleBars(rules = [], message = '') {
   if (message) return `<div class="notice warn">${esc(message)}</div>`;
@@ -223,7 +245,7 @@ function renderEC2() {
   const peak = (field, available) => { const values = withData(available); return values.length ? `最大 ${decimal(Math.max(...values.map(item => item[field])))}%` : ''; };
   // 前期間の平均は、前期間のデータがあるインスタンスだけで計算する
   const averageDelta = (field, available, key) => { const pairs = withData(available).map(item => [item[field], previousOf('ec2', item.instance_id, key)]).filter(([, previous]) => previous != null); return delta(mean(pairs.map(([current]) => current)), mean(pairs.map(([, previous]) => previous))); };
-  const instanceCaption = configured ? 'AWS収集中' : (state.snapshot.mode === 'demo' ? 'デモモード' : '設定待ち');
+  const instanceCaption = state.snapshot.mode === 'screenshot' ? '撮影用の架空インスタンス' : configured ? 'AWS収集中' : (state.snapshot.mode === 'demo' ? 'デモモード' : '設定待ち');
   const cpuLines = instanceSeries(items, 'name', 'cpu_series'); const memoryLines = instanceSeries(items, 'name', 'memory_series');
   return kpis([['インスタンス数', configured ? number(items.length) : NO_DATA, instanceCaption], ['正常', configured ? number(items.filter(item => item.status === 'Healthy').length) : NO_DATA, 'ステータスチェック'], ['平均CPU', average('cpu_percent', 'cpu_available'), peak('cpu_max_percent', 'cpu_available') || 'CloudWatch', '', averageDelta('cpu_percent', 'cpu_available', 'cpu')], ['平均メモリ', average('memory_percent', 'memory_available'), peak('memory_max_percent', 'memory_available') || 'CloudWatch', '', averageDelta('memory_percent', 'memory_available', 'memory')]])
     + `<div class="grid equal">${card('CPU使用率の推移', timeChart(cpuLines, { unit: '%', max: 100, label: 'インスタンス別CPU使用率の推移' }), legend(cpuLines))}${card('メモリ使用率の推移', timeChart(memoryLines, { unit: '%', max: 100, label: 'インスタンス別メモリ使用率の推移' }), legend(memoryLines))}</div>`
@@ -267,7 +289,7 @@ function renderQueries() {
   const options = [`<option value="">保存済みクエリを選択…（${state.savedQueries.length}件）</option>`, ...state.savedQueries.map(query => `<option value="${esc(query.id)}"${query.id === state.selectedQuery ? ' selected' : ''}>${esc(query.name)}</option>`)].join('');
   const usage = athena.usage;
   const locked = Boolean(usage?.locked);
-  const runLabel = running ? '実行中…' : locked ? '上限に到達' : athena.configured ? '▶ クエリを実行' : 'Athena未設定';
+  const runLabel = state.snapshot.mode === 'screenshot' ? '撮影用・実行不可' : running ? '実行中…' : locked ? '上限に到達' : athena.configured ? '▶ クエリを実行' : 'Athena未設定';
   const editor = `<select id="saved-query" class="query-picker" aria-label="保存済みクエリ">${options}</select>${selected?.description ? `<p class="muted query-description">${esc(selected.description)}</p>` : ''}<textarea id="sql" aria-label="SQLエディタ" spellcheck="false" placeholder="保存済みクエリを選択するか、SQLを入力してください">${esc(state.sql)}</textarea><label class="private-option"><input type="checkbox" id="private-query"${state.privateQuery ? ' checked' : ''}>結果を共有しない（SQL と結果は自分にだけ表示。実行したことは履歴に残ります）</label><div class="actions"><small>SELECT/WITHのみ · log_time の範囲は最大 ${number(usage?.max_query_days ?? 31)} 日 · 同時実行は 1 件まで</small><button class="button" id="run" ${athena.configured && !running && !locked ? '' : 'disabled'}>${runLabel}</button></div>`;
   const settings = [['ワークグループ', athena.workgroup], ['データベース', athena.database], ['テーブル', athena.table], ['リージョン', athena.region]].map(([label, value]) => `<div class="metric"><small>${label}</small><strong class="setting">${esc(value || '未設定')}</strong></div>`).join('');
   const summary = `${usageBlock(usage)}<div class="mini settings">${settings}</div>${athena.configured ? '' : `<div class="notice warn">${esc(athena.message || 'Athenaの設定を読み込み中…')}</div>`}<div class="notice">クエリは「実行」を押したときだけ発行されます。料金はスキャン量 1TB あたり約 5 USD（1 クエリ最小 10MB）です。1日の使用額が上限に達すると、管理者が上限を引き上げるまで実行できなくなります。</div>`;
@@ -293,7 +315,7 @@ function resultCard(query) {
   else if (!query.columns?.length) body = `<div class="notice warn">${esc(query.error || '結果を取得できませんでした。')}</div>`;
   // 結果が長くても画面が伸びないよう、表は高さを固定してスクロールさせる
   else body = `<p class="muted result-count">${number((query.rows || []).length)} 行${query.truncated ? '（表示上限）' : ''}</p><div class="result-table">${table(query.columns.map(esc), (query.rows || []).map(row => row.map(esc)))}</div>` + (query.truncated ? '<div class="notice">先頭 1,000 行のみ表示しています。全件は「CSVダウンロード」で取得できます。</div>' : '');
-  const download = query.state === 'SUCCEEDED' ? `<button class="button" data-csv="${esc(query.id)}">⤓ CSVダウンロード</button>` : '';
+  const download = query.state === 'SUCCEEDED' && state.snapshot.mode !== 'screenshot' ? `<button class="button" data-csv="${esc(query.id)}">⤓ CSVダウンロード</button>` : '';
   return card(`結果: ${esc(query.name)}`, `${body}<details class="query-sql"><summary>実行したSQL</summary><pre>${esc(query.sql)}</pre></details>`, `<div class="result-actions"><small>${esc(formatDate(query.started_at))}</small>${download}</div>`);
 }
 // S3 の署名付き URL（有効期限 5 分）を受け取り、ブラウザで全件の CSV をダウンロードする
@@ -374,6 +396,7 @@ function bindContent() {
   document.querySelectorAll('[data-csv]').forEach(button => button.addEventListener('click', () => downloadCsv(button.dataset.csv, button)));
   layoutCharts();
   bindChartTooltips();
+  animateCharts();
 }
 async function runQuery() {
   const saved = state.savedQueries.find(query => query.id === state.selectedQuery);
@@ -420,7 +443,7 @@ function initializePasswordDialog() {
     try {
       const result = await api('/api/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current_password: current, new_password: next }) });
       dialog.close(); form.reset();
-      if (result.relogin) { window.alert('パスワードを変更しました。新しいパスワードでログインしてください。'); window.location.href = '/login'; return; }
+      if (result.relogin) { window.alert('パスワードを変更しました。新しいパスワードでログインしてください。'); window.location.href = '/login' + window.location.search; return; }
       window.alert('パスワードを変更しました。他の端末やブラウザのログインは解除されました。');
     } catch (failure) { showError(failure.message); } finally { submit.disabled = false; submit.textContent = '変更する'; }
   });
@@ -431,12 +454,12 @@ async function loadSavedQueries() {
 }
 // ショートカットからクエリ画面を開き、保存済みクエリを選択する（実行はしない）
 async function openSavedQuery(id) {
-  state.page = 'queries'; state.search = ''; render();
+  state.page = 'queries'; state.search = ''; syncViewURL(); render();
   await loadQueriesPage();
   selectSavedQuery(id);
 }
 function selectedRangeLabel() { if (!state.snapshot?.start || !state.snapshot?.end) return ''; const comparison = state.snapshot.comparison; return `期間: ${formatDate(state.snapshot.start)} 〜 ${formatDate(state.snapshot.end)}${comparison ? ` · 比較: ${formatDate(comparison.start)} 〜 ${formatDate(comparison.end)}` : ''}`; }
-function render() { if (!state.snapshot) return; setHeader(); $('mode-label').textContent = state.snapshot.mode === 'demo' ? 'デモモード（空）' : 'AWSモード'; $('mode-detail').textContent = state.snapshot.mode === 'demo' ? '架空データなし' : `${state.snapshot.region} · ${state.snapshot.account ? `アカウント ${state.snapshot.account}` : '収集待ち'}`; const views = { overview: renderOverview, waf: renderWAF, ec2: renderEC2, rds: renderRDS, queries: renderQueries }; chartRegistry.length = 0; $('app').innerHTML = views[state.page](); bindContent(); const collector = state.snapshot.collector; const updated = collector.latest_data ? `${formatDate(collector.latest_data)} までのデータ` : '収集未実行'; setStatus(statusLabel(collector.status), [updated, selectedRangeLabel()].filter(Boolean).join(' · ')); }
+function render(animate = false) { if (!state.snapshot) return; if (animate) chartEntranceStartedAt = performance.now(); setHeader(); $('mode-label').textContent = state.snapshot.mode === 'screenshot' ? '撮影モード（架空）' : state.snapshot.mode === 'demo' ? 'デモモード（空）' : 'AWSモード'; $('mode-detail').textContent = state.snapshot.mode === 'screenshot' ? '架空データ · AWS 接続なし' : state.snapshot.mode === 'demo' ? '架空データなし' : `${state.snapshot.region} · ${state.snapshot.account ? `アカウント ${state.snapshot.account}` : '収集待ち'}`; const views = { overview: renderOverview, waf: renderWAF, ec2: renderEC2, rds: renderRDS, queries: renderQueries }; chartRegistry.length = 0; $('app').innerHTML = views[state.page](); bindContent(); const collector = state.snapshot.collector; const updated = collector.latest_data ? `${formatDate(collector.latest_data)} までのデータ` : '収集未実行'; setStatus(statusLabel(collector.status), [updated, selectedRangeLabel()].filter(Boolean).join(' · ')); }
 // カスタム期間は常に JST（UTC+9）で扱い、利用者の PC のタイムゾーンには依存しない。
 // hidden input には JST の時刻を "YYYY-MM-DDTHH:mm" で入れ、API に送るときに UTC へ変換する。
 // ピッカー内の「JST の時刻」は、UTC のフィールド（getUTCHours など）が JST の値を表す Date で持つ
@@ -561,42 +584,102 @@ function initializeDatePicker() {
 }
 // ページ上部で選択中の期間を返す。preset は固定期間（日数）のときだけ設定される
 function selectedRange() {
-  const period = $('period').value;
+  const period = appliedPeriod;
   if (period !== 'custom') { const end = new Date(); return { start: new Date(end.getTime() - Number(period) * 24 * 60 * 60 * 1000), end, preset: period }; }
   // hidden input の値は JST なので、+09:00 を付けて実際の時刻にする（API には toISOString で UTC として送る）
   const start = new Date(`${$('period-start').value}:00+09:00`); const end = new Date(`${$('period-end').value}:00+09:00`);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) throw new Error('期間の開始と終了を選択してください。');
   if (end <= start) throw new Error('終了は開始より後の日時にしてください。');
+  if (end > new Date()) throw new Error('未来の日時は指定できません。');
+  if (end - start > MAX_RANGE_DAYS * DAY_MS) throw new Error(`指定できる期間は最大${MAX_RANGE_DAYS}日です。`);
   return { start, end };
 }
 function rangeQuery() { const range = selectedRange(); const params = new URLSearchParams(); if (range.preset) { params.set('period', range.preset); } else { params.set('start', range.start.toISOString()); params.set('end', range.end.toISOString()); } return params.toString(); }
+// URL には表示中のページと適用済み期間だけを保存する。SQL や未適用のピッカー入力は含めない。
+function syncViewURL(replace = false) {
+  const url = new URL(window.location.href);
+  const range = selectedRange();
+  url.searchParams.set('page', state.page);
+  url.searchParams.set('period', range.preset || 'custom');
+  url.searchParams.delete('start'); url.searchParams.delete('end');
+  if (!range.preset) {
+    url.searchParams.set('start', range.start.toISOString());
+    url.searchParams.set('end', range.end.toISOString());
+  }
+  if (url.href !== window.location.href) window.history[replace ? 'replaceState' : 'pushState'](null, '', url);
+}
+// ピッカーと同じ分単位の UTC 日時を受け付け、存在しない日付も除外する。
+function dateFromURL(value) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::00(?:\.000)?)?Z$/.test(value || '')) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 16) === value.slice(0, 16) ? date : null;
+}
+function restoreViewFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const page = params.get('page');
+  state.page = Object.hasOwn(pages, page) ? page : 'overview';
+  state.search = '';
+  const period = params.get('period') || '1';
+  $('period').value = Object.hasOwn(PERIOD_LABELS, period) ? period : '1';
+  initializeCustomRange();
+  if (period === 'custom') {
+    const start = dateFromURL(params.get('start')); const end = dateFromURL(params.get('end'));
+    if (start && end && end > start && end <= new Date() && end - start <= MAX_RANGE_DAYS * DAY_MS) {
+      $('period').value = 'custom';
+      $('period-start').value = jstToInput(new Date(start.getTime() + JST_OFFSET_MS));
+      $('period-end').value = jstToInput(new Date(end.getTime() + JST_OFFSET_MS));
+    }
+  }
+  closeDatePicker();
+  appliedPeriod = $('period').value;
+  $('custom-range').hidden = $('period').value !== 'custom';
+  updateRangePill();
+  // ページや期間の不正な指定はそれぞれ既定値へ戻し、履歴を増やさず正規化する。
+  syncViewURL(true);
+}
+let dashboardRequestID = 0;
 // silent = true のときは読み込み中の表示を出さず、失敗しても現在の画面を残す（自動更新用）
-async function loadDashboard(refresh = false, silent = false) {
+async function loadDashboard(refresh = false, silent = false, animate = !silent) {
+  const requestID = ++dashboardRequestID;
   const apply = $('apply-period'); const refreshButton = $('refresh');
   state.loading = true;
   try {
     const query = rangeQuery();
+    if (!silent) syncViewURL();
     if (!silent) { if (apply && $('period').value === 'custom') { apply.disabled = true; apply.textContent = '適用中…'; } refreshButton.disabled = true; setStatus('選択期間を読み込み中', 'CloudWatchに問い合わせ中…'); }
-    state.snapshot = await api(`/api/${refresh ? 'refresh' : 'dashboard'}?${query}`, refresh ? { method: 'POST' } : undefined);
+    const snapshot = await api(`/api/${refresh ? 'refresh' : 'dashboard'}?${query}`, refresh ? { method: 'POST' } : undefined);
+    if (requestID !== dashboardRequestID) return;
+    state.snapshot = snapshot;
     (state.snapshot.waf?.actions || []).forEach(action => { action.color = ACTION_COLORS[action.name] || action.color; });
-    render();
+    render(animate);
   } catch (error) {
+    if (requestID !== dashboardRequestID) return;
     if (!silent) $('app').innerHTML = `<div class="card empty">ダッシュボードを読み込めませんでした: ${esc(error.message)}</div>`;
     setStatus('データの読み込みエラー', error.message);
   } finally {
-    state.loading = false;
-    if (!silent) { refreshButton.disabled = false; if (apply) { apply.disabled = false; apply.textContent = '適用'; } }
+    if (requestID === dashboardRequestID) {
+      state.loading = false;
+      refreshButton.disabled = false; if (apply) { apply.disabled = false; apply.textContent = '適用'; }
+    }
   }
 }
 // カスタム期間はリクエストのたびに CloudWatch を直接呼び出すため、自動更新の対象外にする
 function autoRefresh() {
-  if (document.hidden || state.loading || $('period').value === 'custom') return;
+  if (document.hidden || state.loading || appliedPeriod === 'custom') return;
   const active = document.activeElement;
   if (active && $('app').contains(active) && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
   loadDashboard(false, true);
 }
 // カスタム期間を選んだら、そのままピッカーを開く（プルダウンのクリック処理が終わってから開く）
 function toggleCustomRange() { const custom = $('period').value === 'custom'; $('custom-range').hidden = !custom; if (custom && !$('period-start').value) initializeCustomRange(); if (custom) setTimeout(openDatePicker); else closeDatePicker(); }
-initializeTheme(); initializeCustomRange(); initializeDatePicker(); initializePasswordDialog(); nav(); $('period').addEventListener('change', () => { toggleCustomRange(); if ($('period').value !== 'custom') { refillSavedQuery(); loadDashboard(); } }); $('apply-period').addEventListener('click', () => { refillSavedQuery(); loadDashboard(); }); $('refresh').addEventListener('click', () => loadDashboard(true)); loadUser(); loadDashboard(); loadSavedQueries(); setInterval(autoRefresh, AUTO_REFRESH_MS);
+initializeTheme(); restoreViewFromURL(); initializeDatePicker(); initializePasswordDialog(); nav(); setHeader();
+$('period').addEventListener('change', () => { toggleCustomRange(); if ($('period').value !== 'custom') { appliedPeriod = $('period').value; refillSavedQuery(); loadDashboard(); } });
+$('apply-period').addEventListener('click', () => { appliedPeriod = 'custom'; refillSavedQuery(); loadDashboard(); });
+$('refresh').addEventListener('click', () => loadDashboard(true));
+window.addEventListener('popstate', () => {
+  restoreViewFromURL(); refillSavedQuery(); setHeader(); loadDashboard();
+  if (state.page === 'queries') loadQueriesPage();
+});
+loadUser(); loadDashboard(); loadSavedQueries(); if (state.page === 'queries') loadQueriesPage(); setInterval(autoRefresh, AUTO_REFRESH_MS);
 // ウィンドウの幅が変わったら、グラフを新しい幅で描き直す
-let resizeFrame = 0; window.addEventListener('resize', () => { cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(layoutCharts); });
+let resizeFrame = 0; window.addEventListener('resize', () => { cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(() => { layoutCharts(); animateCharts(); }); });

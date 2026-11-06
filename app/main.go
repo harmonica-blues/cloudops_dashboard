@@ -314,8 +314,8 @@ func loadConfig(path string) (Config, error) {
 		}
 		cfg.trustedProxies = append(cfg.trustedProxies, prefix.Masked())
 	}
-	if cfg.Mode != "demo" && cfg.Mode != "aws" {
-		return cfg, fmt.Errorf("mode には demo または aws を指定してください（指定値: %q）", cfg.Mode)
+	if cfg.Mode != "demo" && cfg.Mode != "aws" && cfg.Mode != "screenshot" {
+		return cfg, fmt.Errorf("mode には demo、aws、screenshot を指定してください（指定値: %q）", cfg.Mode)
 	}
 	if cfg.Athena.DailyBudgetUSD <= 0 {
 		return cfg, fmt.Errorf("athena.daily_budget_usd には 0 より大きい金額（USD）を指定してください（指定値: %v）", cfg.Athena.DailyBudgetUSD)
@@ -339,6 +339,9 @@ func (a *App) snapshot(period int) DashboardSnapshot {
 }
 
 func (a *App) buildSnapshot(period int) DashboardSnapshot {
+	if a.config.Mode == "screenshot" {
+		return screenshotSnapshot(presetMetricRange(period))
+	}
 	now := time.Now().UTC()
 	state := CollectorState{
 		LastAttempt: now.Format(time.RFC3339), Status: "waiting",
@@ -386,6 +389,10 @@ func (a *App) dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	if a.markAccess() {
 		a.resumeCollection(context.WithoutCancel(r.Context()), metricRange.Period, !metricRange.Custom)
 	}
+	if a.config.Mode == "screenshot" {
+		writeJSON(w, http.StatusOK, screenshotSnapshot(metricRange))
+		return
+	}
 	if metricRange.Custom && a.collector != nil {
 		snapshot, collectErr := a.collector.collect(r.Context(), a.config, metricRange)
 		if collectErr != nil {
@@ -399,6 +406,9 @@ func (a *App) dashboardHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) athenaStatus() AthenaStatus {
+	if a.config.Mode == "screenshot" {
+		return screenshotAthenaStatus()
+	}
 	cfg := a.config.Athena
 	status := AthenaStatus{Region: athenaRegion(a.config), Database: cfg.Database, Catalog: cfg.Catalog, Workgroup: cfg.Workgroup, Table: cfg.Table, Missing: athenaMissingSettings(cfg)}
 	switch {
@@ -415,6 +425,9 @@ func (a *App) athenaStatus() AthenaStatus {
 }
 
 func (a *App) listQueries() []*Query {
+	if a.config.Mode == "screenshot" {
+		return screenshotQueries()
+	}
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	items := make([]*Query, 0, len(a.queries))
@@ -648,6 +661,10 @@ func (a *App) apiHandler(w http.ResponseWriter, r *http.Request) {
 		// 更新ボタンは表示中の期間をこの後で収集するため、再開時はそれ以外の期間だけをバックグラウンドで収集する
 		if a.markAccess() {
 			a.resumeCollection(context.WithoutCancel(r.Context()), metricRange.Period, false)
+		}
+		if a.config.Mode == "screenshot" {
+			writeJSON(w, http.StatusOK, screenshotSnapshot(metricRange))
+			return
 		}
 		if metricRange.Custom && a.collector != nil {
 			snapshot, collectErr := a.collector.collect(r.Context(), a.config, metricRange)
