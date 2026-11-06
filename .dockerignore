@@ -24,3 +24,6 @@ __pycache__/
 
 # Local-only maintenance page
 deploy/maintenance/
+
+# Local assistant instructions
+CLAUDE.md
