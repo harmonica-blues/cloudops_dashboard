@@ -1,6 +1,6 @@
 # CloudOps — 設定・運用ガイド
 
-[プロジェクト紹介](../README.md) · [English overview](../README.en.md)
+[プロジェクト紹介](../README.md) · **日本語** | [English](operations.en.md)
 
 このガイドのコマンドは、リポジトリのルートで実行してください。
 
@@ -428,7 +428,7 @@ t3.small などメモリ 2GB のインスタンスでは、イメージのビル
 1. **PC でテストする**（このフォルダで実行。Docker Desktop を起動しておきます）。
 
    ```powershell
-   docker run --rm -v "${PWD}:/src" -w /src golang:1.24-alpine go test ./...
+   docker run --rm -v "${PWD}:/src" -w /src golang:1.27.4-alpine go test ./...
    ```
 
 2. **PC でビルドして保存する**。EC2 が arm64（t4g など）の場合は `linux/arm64` にします。

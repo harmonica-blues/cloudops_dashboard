@@ -8,6 +8,25 @@ CloudOps is a self-hosted AWS monitoring dashboard built with Go and plain HTML,
 
 The interface is in Japanese and supports light and dark themes. Run it with Docker Compose locally or deploy it behind an HTTPS Application Load Balancer on EC2.
 
+![CloudOps overview with fictional data](docs/images/overview.jpg)
+
+*Captured with fictional screenshot data. See the [feature guide](docs/features.en.md) for the full gallery.*
+
+## Project background and goals
+
+Day-to-day AWS operations often involve checking WAF traffic alongside EC2 resource usage and RDS load. CloudOps brings those signals together so operators can review them without switching between service consoles, then investigate WAF logs when more detail is needed.
+
+The intended audience is engineers and small teams operating a defined set of AWS resources. Monitored resources are configured explicitly, with a shared interface for routine checks, comparisons with the preceding period, and request investigations. The UI is in Japanese, with setup and usage documentation in Japanese and English.
+
+The implementation focuses on four priorities:
+
+- **Predictable operating costs:** Cache metrics, pause collection when idle, and combine manual Athena execution with spending limits to reduce unnecessary API usage.
+- **Straightforward deployment and maintenance:** Embed the frontend in the Go binary and use SQLite and Docker Compose to keep the application's deployment components together.
+- **Clear data boundaries:** Show unavailable real metrics explicitly and isolate fictional presentation and testing data in a dedicated mode.
+- **Operational behavior:** Include login, sessions, auditing, SQL execution limits, persistence, and deployment behind HTTPS alongside metric visualization.
+
+The repository presents an implementation spanning AWS API integration in Go, the user interface, usage controls, tests, and container operations.
+
 ## Features
 
 | View | What it shows |
@@ -65,7 +84,7 @@ docker compose --env-file .env.local up -d --build
 docker compose --env-file .env.local exec cloudops /app/cloudops user add your-user
 ```
 
-The local example uses [http://127.0.0.1:8082](http://127.0.0.1:8082). See the [configuration and operations guide (Japanese)](docs/operations.ja.md) for Windows settings, IAM permissions, EC2 + ALB deployment, user management, and backups.
+The local example uses [http://127.0.0.1:8082](http://127.0.0.1:8082). See the [configuration and operations guide](docs/operations.en.md) for Windows settings, IAM permissions, EC2 + ALB deployment, user management, and backups.
 
 In `aws` mode, missing metrics are never replaced with fictional values. An empty `demo` mode is also available.
 
@@ -73,7 +92,7 @@ In `aws` mode, missing metrics are never replaced with fictional values. An empt
 
 | Layer | Technology |
 | --- | --- |
-| Backend | Go 1.24, standard HTTP server, AWS SDK for Go v2 |
+| Backend | Go 1.27.4, standard HTTP server, AWS SDK for Go v2 |
 | Frontend | HTML, CSS, JavaScript; no framework or frontend build step |
 | Persistence | SQLite in pure Go; no CGO |
 | Runtime | Docker Compose, distroless nonroot image |
@@ -99,10 +118,10 @@ docs/        Configuration and operations guide
 Run the tests on Linux / macOS:
 
 ```bash
-docker run --rm -v "$PWD:/src" -w /src golang:1.24-alpine go test ./...
+docker run --rm -v "$PWD:/src" -w /src golang:1.27.4-alpine go test ./...
 ```
 
 - [Features and screenshots](docs/features.en.md)
-- [Configuration and operations guide (Japanese)](docs/operations.ja.md)
-- [Writing saved queries (Japanese)](queries/README.md)
+- [Configuration and operations guide](docs/operations.en.md)
+- [Writing saved queries](queries/README.en.md)
 - [日本語 README](README.md)

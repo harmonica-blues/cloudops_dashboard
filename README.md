@@ -8,6 +8,25 @@ CloudOps は、Go と HTML / CSS / JavaScript で作ったセルフホスト型�
 
 画面は日本語で、ライト・ダークの両テーマに対応しています。Docker Compose で起動し、EC2 と ALB を使った HTTPS 環境にも配置できます。
 
+![CloudOps の概要画面（架空データ）](docs/images/overview.jpg)
+
+*撮影用の架空データを使用しています。各画面の画像は[機能紹介](docs/features.ja.md)をご覧ください。*
+
+## 開発の背景と目的
+
+AWS の日常運用では、WAF のリクエスト状況、EC2 のリソース使用率、RDS の負荷を関連付けて確認する場面があります。CloudOps は、こうした情報をサービスごとのコンソールを行き来せずに把握し、必要なときに WAF ログの調査へ進めるようにすることを目的としています。
+
+想定する利用者は、限られた AWS リソースを運用するエンジニアや小規模なチームです。監視対象を設定で指定し、日々の状態確認、直前の期間との比較、リクエスト調査をひとつの画面から行います。UI は日本語で、設定・利用方法は日本語と英語で紹介しています。
+
+開発では、次の点を重視しています。
+
+- **運用コストの見通し**: キャッシュと無操作時の収集停止で不要な API 呼び出しを抑え、Athena は手動実行と利用額の制限を組み合わせます。
+- **配置と保守のしやすさ**: Go にフロントエンドを埋め込み、SQLite と Docker Compose を使って、アプリケーションの起動に必要な構成をまとめています。
+- **データの区別**: 実データが取得できない場合はその状態を表示し、紹介・検証用の架空データは専用モードに分離しています。
+- **運用を含む実装**: メトリクスの表示に加えて、ログイン、セッション、操作ログ、SQL の実行制限、永続化、HTTPS 環境への配置まで扱います。
+
+このリポジトリでは、Go による AWS API 連携から画面表示、利用制限、テスト、コンテナでの運用までを一連の実装として紹介しています。
+
 ## 主な機能
 
 | 画面 | 確認できること |
@@ -73,7 +92,7 @@ docker compose --env-file .env.local exec cloudops /app/cloudops user add your-u
 
 | 項目 | 使用技術 |
 | --- | --- |
-| バックエンド | Go 1.24、標準 HTTP サーバー、AWS SDK for Go v2 |
+| バックエンド | Go 1.27.4、標準 HTTP サーバー、AWS SDK for Go v2 |
 | フロントエンド | HTML、CSS、JavaScript。フレームワーク・ビルド工程なし |
 | データ保存 | SQLite（Go 実装、CGO 不要） |
 | 実行環境 | Docker Compose、distroless nonroot イメージ |
@@ -99,7 +118,7 @@ docs/        設定・運用ガイド
 Linux / macOS でのテスト:
 
 ```bash
-docker run --rm -v "$PWD:/src" -w /src golang:1.24-alpine go test ./...
+docker run --rm -v "$PWD:/src" -w /src golang:1.27.4-alpine go test ./...
 ```
 
 - [機能紹介・スクリーンショット](docs/features.ja.md)

@@ -4,7 +4,7 @@
 
 各画面の用途と、表示される情報を紹介します。画面は日本語で、ライト・ダークの両テーマに対応しています。
 
-このページに掲載するスクリーンショットには、個人情報や実環境の情報を含まない `screenshot` モードの架空データを使用します。起動方法は [README](../README.md#aws-なしで試す) を参照してください。
+このページのスクリーンショットは、個人情報や実環境の情報を含まない `screenshot` モードの架空データで撮影しています。起動方法は [README](../README.md#aws-なしで試す) を参照してください。
 
 ## 1. 概要
 
@@ -18,11 +18,7 @@
 
 ### スクリーンショット
 
-*概要画面の画像をここに追加予定です。*
-
-<!-- 画像の保存先: images/overview.png。配置後、次の行をコメントから外す。
-![概要画面（架空データ）](images/overview.png)
--->
+![概要画面（架空データ）](images/overview.jpg)
 
 ## 2. WAF
 
@@ -37,12 +33,8 @@
 
 ### スクリーンショット
 
-*WAF のグラフ・ルール別集計と、サンプルリクエストの画像をここに追加予定です。*
-
-<!--
-![WAF の集計とグラフ（架空データ）](images/waf.png)
-![WAF サンプルリクエスト（架空データ）](images/waf-sampled-requests.png)
--->
+![WAF の集計とグラフ（架空データ）](images/waf.jpg)
+![WAF サンプルリクエスト（架空データ）](images/waf-sampled-requests.jpg)
 
 ## 3. EC2
 
@@ -57,11 +49,7 @@
 
 ### スクリーンショット
 
-*EC2 画面の画像をここに追加予定です。*
-
-<!--
-![EC2 画面（架空データ）](images/ec2.png)
--->
+![EC2 画面（架空データ）](images/ec2.jpg)
 
 ## 4. RDS
 
@@ -75,11 +63,7 @@
 
 ### スクリーンショット
 
-*RDS 画面の画像をここに追加予定です。*
-
-<!--
-![RDS 画面（架空データ）](images/rds.png)
--->
+![RDS 画面（架空データ）](images/rds.jpg)
 
 ## 5. Athena クエリ
 
@@ -96,12 +80,8 @@ WAF ログを SQL で調査します。AWS モードでは Athena・Glue・S3 �
 
 ### スクリーンショット
 
-*SQL エディタ・使用額・実行履歴と、結果の画像をここに追加予定です。*
-
-<!--
-![Athena クエリ画面（架空データ）](images/queries.png)
-![クエリ結果（架空データ）](images/query-results.png)
--->
+![Athena クエリ画面（架空データ）](images/queries.jpg)
+![クエリ結果（架空データ）](images/query-results.jpg)
 
 ## 6. 共通機能
 
@@ -120,12 +100,17 @@ WAF ログを SQL で調査します。AWS モードでは Athena・Glue・S3 �
 
 ### スクリーンショット
 
-*テーマの比較とカスタム期間ピッカーの画像をここに追加予定です。*
+![ライトテーマの概要画面（架空データ）](images/overview-light.jpg)
+![カスタム期間の選択](images/date-picker.jpg)
 
-<!--
-![ライトテーマの概要画面（架空データ）](images/overview-light.png)
-![カスタム期間の選択](images/date-picker.png)
--->
+### モバイル表示
+
+<details>
+<summary>スマートフォン幅の概要画面を見る</summary>
+
+<img src="images/overview-mobile.jpg" alt="モバイル表示の概要画面（架空データ）" width="320">
+
+</details>
 
 ## 関連ドキュメント
 

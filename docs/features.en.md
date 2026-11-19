@@ -4,7 +4,7 @@
 
 A tour of each view and the information it provides. The interface is in Japanese and supports light and dark themes.
 
-Screenshots for this page will use fictional data from `screenshot` mode, without personal or production information. See the [README](../README.en.md#try-it-without-aws) for startup instructions.
+These screenshots were captured using fictional data from `screenshot` mode, without personal or production information. See the [README](../README.en.md#try-it-without-aws) for startup instructions.
 
 ## 1. Overview
 
@@ -18,11 +18,7 @@ Check the state of your infrastructure in one view.
 
 ### Screenshot
 
-*An overview screenshot will be added here.*
-
-<!-- Add images to images/, then uncomment the relevant image links.
-![Overview with fictional data](images/overview.png)
--->
+![Overview with fictional data](images/overview.jpg)
 
 ## 2. WAF
 
@@ -37,12 +33,8 @@ Samples are a subset of traffic and always cover the last three hours, regardles
 
 ### Screenshots
 
-*WAF charts, rule totals, and sampled request screenshots will be added here.*
-
-<!--
-![WAF totals and charts with fictional data](images/waf.png)
-![WAF sampled requests with fictional data](images/waf-sampled-requests.png)
--->
+![WAF totals and charts with fictional data](images/waf.jpg)
+![WAF sampled requests with fictional data](images/waf-sampled-requests.jpg)
 
 ## 3. EC2
 
@@ -57,11 +49,7 @@ Memory usage requires a metric publisher such as the CloudWatch Agent. In AWS mo
 
 ### Screenshot
 
-*An EC2 screenshot will be added here.*
-
-<!--
-![EC2 view with fictional data](images/ec2.png)
--->
+![EC2 view with fictional data](images/ec2.jpg)
 
 ## 4. RDS
 
@@ -75,11 +63,7 @@ Inspect database load and capacity trends.
 
 ### Screenshot
 
-*An RDS screenshot will be added here.*
-
-<!--
-![RDS view with fictional data](images/rds.png)
--->
+![RDS view with fictional data](images/rds.jpg)
 
 ## 5. Athena queries
 
@@ -96,12 +80,8 @@ Only one query can run at a time. In `screenshot` mode, results and spending are
 
 ### Screenshots
 
-*Screenshots of the editor, spending, execution history, and results will be added here.*
-
-<!--
-![Athena query view with fictional data](images/queries.png)
-![Query results with fictional data](images/query-results.png)
--->
+![Athena query view with fictional data](images/queries.jpg)
+![Query results with fictional data](images/query-results.jpg)
 
 ## 6. Shared features
 
@@ -120,15 +100,20 @@ Aggregation uses UTC, display timestamps use the configured timezone, and custom
 
 ### Screenshots
 
-*Theme comparison and custom range picker screenshots will be added here.*
+![Light theme overview with fictional data](images/overview-light.jpg)
+![Custom range picker](images/date-picker.jpg)
 
-<!--
-![Light theme overview with fictional data](images/overview-light.png)
-![Custom range picker](images/date-picker.png)
--->
+### Mobile layout
+
+<details>
+<summary>View the overview at smartphone width</summary>
+
+<img src="images/overview-mobile.jpg" alt="Mobile overview with fictional data" width="320">
+
+</details>
 
 ## Related documentation
 
 - [Project overview and startup](../README.en.md)
-- [Configuration and operations guide (Japanese)](operations.ja.md)
-- [Writing saved queries (Japanese)](../queries/README.md)
+- [Configuration and operations guide](operations.en.md)
+- [Writing saved queries](../queries/README.en.md)
